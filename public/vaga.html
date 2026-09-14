@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Trampo Cláudio</title>
+<script>
+  // Quem acessa pelo Android é redirecionado direto pra Play Store,
+  // sem precisar ver o site no navegador — só iPhone/PC veem a página.
+  if (/Android/i.test(navigator.userAgent)) {
+    window.location.href = 'https://play.google.com/store/apps/details?id=com.trampoclaudiotemp';
+  }
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1f14;
+    color: #f4f1e8;
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+  }
+  .container { max-width: 480px; margin: 0 auto; padding: 24px 20px; }
+  .selo {
+    width: 40px; height: 40px; border-radius: 8px;
+    background: #e0a840; display: flex; align-items: center; justify-content: center;
+    transform: rotate(-4deg); font-weight: 800; color: #1a1f14; margin-bottom: 20px;
+  }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 24px; margin-bottom: 4px; }
+  .empresa { color: #b7bbab; font-size: 14px; margin-bottom: 16px; }
+  .tag-row { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .tag {
+    background: #22271d; border: 1px solid #333a28; border-radius: 100px;
+    padding: 6px 12px; font-size: 12px; color: #e0a840;
+  }
+  .info-block { margin-bottom: 20px; }
+  .eyebrow { font-size: 11px; text-transform: uppercase; color: #e0a840; letter-spacing: 0.5px; margin-bottom: 6px; }
+  p { font-size: 14px; line-height: 1.5; color: #d8d5c8; }
+  .salario { font-size: 18px; font-weight: 700; margin-bottom: 24px; }
+  .cta-whatsapp {
+    display: block; text-align: center; background: #4a7c3a; color: #fff;
+    text-decoration: none; padding: 16px; border-radius: 12px; font-weight: 700;
+    margin-top: 20px;
+  }
+  .baixar-app {
+    display: block; text-align: center; background: none; border: 1px solid #e0a840;
+    color: #e0a840; text-decoration: none; padding: 14px; border-radius: 12px;
+    font-weight: 700; margin-top: 12px;
+  }
+  .loading-state, .error-state { text-align: center; padding-top: 80px; color: #b7bbab; }
+</style>
+</head>
+<body>
+
+<div id="conteudo" class="container">
+  <div class="loading-state">Carregando...</div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+const params = new URLSearchParams(window.location.search);
+const id = params.get('id');
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+async function carregar() {
+  const el = document.getElementById('conteudo');
+  if (!id) {
+    el.innerHTML = '<div class="error-state">Vaga não encontrada.</div>';
+    return;
+  }
+  try {
+    const resp = await fetch(`${API_BASE}/vagas/${id}`);
+    if (!resp.ok) throw new Error('não encontrada');
+    const v = await resp.json();
+
+    document.title = `${v.cargo} — Trampo Cláudio`;
+
+    const numero = (v.whatsapp || '').replace(/\D/g, '');
+    const textoWhats = encodeURIComponent(`Olá! Vi a vaga de ${v.cargo} na ${v.empresa_nome} pelo Trampo Cláudio e gostaria de saber mais.`);
+
+    el.innerHTML = `
+      <div class="selo">TR</div>
+      <h1>${escapeHtml(v.cargo)}</h1>
+      <div class="empresa">${escapeHtml(v.empresa_nome)}</div>
+      <div class="tag-row">
+        <span class="tag">${escapeHtml(v.area)}</span>
+        <span class="tag">${escapeHtml(v.bairro)}</span>
+        ${v.tipo_contrato ? `<span class="tag">${escapeHtml(v.tipo_contrato)}</span>` : ''}
+      </div>
+      <div class="salario">${v.salario ? escapeHtml(v.salario) : 'Salário a combinar'}</div>
+      ${v.descricao ? `
+        <div class="info-block">
+          <div class="eyebrow">Descrição</div>
+          <p>${escapeHtml(v.descricao)}</p>
+        </div>
+      ` : ''}
+      <a class="cta-whatsapp" href="https://wa.me/55${numero}?text=${textoWhats}" target="_blank" rel="noopener">
+        📲 Chamar no WhatsApp
+      </a>
+      <a class="baixar-app" href="https://play.google.com/store/apps/details?id=com.trampoclaudiotemp" target="_blank" rel="noopener">
+        📱 Baixar o app Trampo Cláudio
+      </a>
+    `;
+  } catch (e) {
+    el.innerHTML = '<div class="error-state">Não foi possível carregar essa vaga.</div>';
+  }
+}
+
+carregar();
+</script>
+</body>
+</html>
