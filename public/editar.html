@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Editar vaga — Trampo Cláudio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d1009;
+    color: #f4f1e8;
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+  }
+  .container {
+    max-width: 480px; margin: 0 auto; padding: 20px 20px 40px;
+    background: #1a1f14; min-height: 100vh; box-shadow: 0 0 40px rgba(0,0,0,0.4);
+  }
+  .voltar { color: #e0a840; text-decoration: none; font-size: 13px; font-weight: 700; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; margin: 16px 0 20px; }
+
+  label { display: block; color: #b7bbab; font-size: 12.5px; font-weight: 700; margin: 16px 0 8px; }
+  input, textarea {
+    width: 100%; background: #22271d; border: 1px solid #333a28; border-radius: 12px;
+    padding: 12px 14px; color: #f4f1e8; font-size: 14px; font-family: 'Inter', sans-serif;
+  }
+  input::placeholder, textarea::placeholder { color: #7a7d6f; }
+  textarea { min-height: 90px; resize: vertical; }
+
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    padding: 9px 14px; border-radius: 100px; border: 1px solid #333a28;
+    background: transparent; color: #b7bbab; font-size: 12.5px; font-weight: 600;
+    cursor: pointer; font-family: 'Inter', sans-serif;
+  }
+  .chip.active { background: #e0a840; border-color: #e0a840; color: #1a1f14; }
+
+  .sugestoes { background: #22271d; border: 1px solid #333a28; border-radius: 12px; margin-top: 6px; overflow: hidden; }
+  .sugestao-item { padding: 11px 14px; border-bottom: 1px solid #333a28; cursor: pointer; font-size: 13.5px; font-weight: 600; }
+  .sugestao-item:last-child { border-bottom: none; }
+  .sugestao-item:hover { background: #2a3122; }
+
+  .botao-salvar {
+    width: 100%; margin-top: 30px; background: #e0a840; border: none; border-radius: 14px;
+    padding: 16px; color: #1a1f14; font-weight: 800; font-size: 15px; cursor: pointer;
+    font-family: 'Inter', sans-serif;
+  }
+  .botao-salvar:disabled { opacity: 0.6; }
+  .loading-state, .error-state { text-align: center; padding-top: 60px; color: #b7bbab; }
+  .mensagem { text-align: center; padding: 60px 20px; }
+  .mensagem h2 { font-family: 'Space Grotesk', sans-serif; font-size: 20px; margin-bottom: 10px; }
+  .mensagem p { color: #b7bbab; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="/minhas-vagas.html" class="voltar">← Voltar</a>
+  <h1>Editar vaga</h1>
+
+  <div id="conteudo">
+    <div class="loading-state">Carregando...</div>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+const params = new URLSearchParams(window.location.search);
+const id = params.get('id');
+
+const AREAS = [
+  'Construção', 'Comércio e Vendas', 'Alimentação', 'Domésticos e Cuidados',
+  'Logística e Transporte', 'Indústria e Produção', 'Administrativo',
+  'Beleza e Estética', 'Saúde', 'Educação', 'Rural e Agropecuária',
+  'Segurança e Limpeza', 'Outros',
+];
+
+let areaSelecionada = null;
+let debounceCargo = null;
+
+function getDeviceId() {
+  let id = localStorage.getItem('trampo_device_id');
+  if (!id) {
+    id = 'web-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem('trampo_device_id', id);
+  }
+  return id;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+function renderChipsArea() {
+  const el = document.getElementById('chipsArea');
+  el.innerHTML = AREAS.map(a => `
+    <button type="button" class="chip ${areaSelecionada === a ? 'active' : ''}" data-area="${a}">${a}</button>
+  `).join('');
+  el.querySelectorAll('.chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      areaSelecionada = btn.dataset.area;
+      renderChipsArea();
+    });
+  });
+}
+
+async function carregar() {
+  const el = document.getElementById('conteudo');
+  if (!id) {
+    el.innerHTML = '<div class="error-state">Vaga não encontrada.</div>';
+    return;
+  }
+  try {
+    const resp = await fetch(`${API_BASE}/vagas/${id}`);
+    if (!resp.ok) throw new Error();
+    const v = await resp.json();
+    areaSelecionada = v.area;
+
+    el.innerHTML = `
+      <label>Nome da empresa *</label>
+      <input id="empresaNome" type="text" value="${escapeHtml(v.empresa_nome)}">
+
+      <label>WhatsApp (com DDD) *</label>
+      <input id="whatsapp" type="tel" value="${escapeHtml(v.whatsapp)}">
+
+      <label>Área *</label>
+      <div class="chip-row" id="chipsArea"></div>
+
+      <label>Cargo *</label>
+      <input id="cargo" type="text" value="${escapeHtml(v.cargo)}">
+      <div class="sugestoes" id="sugestoes" style="display:none;"></div>
+
+      <label>Bairro *</label>
+      <input id="bairro" type="text" value="${escapeHtml(v.bairro)}">
+
+      <label>Tipo de contrato</label>
+      <input id="tipoContrato" type="text" value="${escapeHtml(v.tipo_contrato || '')}">
+
+      <label>Salário</label>
+      <input id="salario" type="text" value="${escapeHtml(v.salario || '')}">
+
+      <label>Descrição</label>
+      <textarea id="descricao">${escapeHtml(v.descricao || '')}</textarea>
+
+      <button class="botao-salvar" id="btnSalvar">Salvar alterações</button>
+    `;
+
+    renderChipsArea();
+
+    document.getElementById('cargo').addEventListener('input', (e) => {
+      const texto = e.target.value.trim();
+      clearTimeout(debounceCargo);
+      if (texto.length < 2) {
+        document.getElementById('sugestoes').style.display = 'none';
+        return;
+      }
+      debounceCargo = setTimeout(async () => {
+        try {
+          const p = new URLSearchParams({ q: texto });
+          if (areaSelecionada) p.append('area', areaSelecionada);
+          const r = await fetch(`${API_BASE}/cargos?${p.toString()}`);
+          const dados = await r.json();
+          const box = document.getElementById('sugestoes');
+          if (dados.length === 0) {
+            box.style.display = 'none';
+            return;
+          }
+          box.innerHTML = dados.map(d => `<div class="sugestao-item" data-valor="${d.cargo}">${d.cargo}</div>`).join('');
+          box.style.display = 'block';
+          box.querySelectorAll('.sugestao-item').forEach(item => {
+            item.addEventListener('click', () => {
+              document.getElementById('cargo').value = item.dataset.valor;
+              box.style.display = 'none';
+            });
+          });
+        } catch {
+          // silencioso
+        }
+      }, 300);
+    });
+
+    document.getElementById('btnSalvar').addEventListener('click', async () => {
+      const empresaNome = document.getElementById('empresaNome').value.trim();
+      const whatsapp = document.getElementById('whatsapp').value.replace(/\D/g, '');
+      const cargo = document.getElementById('cargo').value.trim();
+      const bairro = document.getElementById('bairro').value.trim();
+      const tipoContrato = document.getElementById('tipoContrato').value.trim();
+      const salario = document.getElementById('salario').value.trim();
+      const descricao = document.getElementById('descricao').value.trim();
+
+      if (!empresaNome) return alert('Informe o nome da empresa');
+      if (!whatsapp) return alert('Informe o WhatsApp');
+      if (!areaSelecionada) return alert('Escolha uma área');
+      if (!cargo) return alert('Informe o cargo');
+      if (!bairro) return alert('Informe o bairro');
+
+      const btn = document.getElementById('btnSalvar');
+      btn.disabled = true;
+      btn.textContent = 'Salvando...';
+
+      try {
+        const resp = await fetch(`${API_BASE}/vagas/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            device_id: getDeviceId(),
+            empresa_nome: empresaNome,
+            whatsapp,
+            area: areaSelecionada,
+            cargo,
+            bairro,
+            tipo_contrato: tipoContrato || undefined,
+            salario: salario || undefined,
+            descricao: descricao || undefined,
+          }),
+        });
+        if (!resp.ok) throw new Error();
+
+        document.getElementById('conteudo').innerHTML = `
+          <div class="mensagem">
+            <h2>Vaga atualizada! 🎉</h2>
+            <p><a href="/minhas-vagas.html" style="color:#e0a840; font-weight:700;">Voltar pra Minhas vagas</a></p>
+          </div>
+        `;
+      } catch {
+        alert('Não foi possível salvar. Verifique se esse dispositivo é o dono da vaga.');
+        btn.disabled = false;
+        btn.textContent = 'Salvar alterações';
+      }
+    });
+  } catch (e) {
+    el.innerHTML = '<div class="error-state">Não foi possível carregar essa vaga.</div>';
+  }
+}
+
+carregar();
+</script>
+</body>
+</html>

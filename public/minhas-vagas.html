@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Minhas vagas — Trampo Cláudio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d1009;
+    color: #f4f1e8;
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+  }
+  .container {
+    max-width: 480px; margin: 0 auto; padding: 20px 20px 40px;
+    background: #1a1f14; min-height: 100vh; box-shadow: 0 0 40px rgba(0,0,0,0.4);
+  }
+  .voltar { color: #e0a840; text-decoration: none; font-size: 13px; font-weight: 700; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; margin: 16px 0 20px; }
+
+  .card {
+    background: #f4f1e8; color: #1a1f14; border-radius: 14px;
+    padding: 16px; margin-bottom: 14px;
+  }
+  .card-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .card-cargo { font-weight: 700; font-size: 16px; }
+  .card-meta { font-size: 12.5px; color: #5a5a4f; margin-top: 4px; }
+  .badge {
+    font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 100px;
+    white-space: nowrap;
+  }
+  .badge.aberta { background: #4a7c3a; color: #fff; }
+  .badge.fechada { background: #8a8a7a; color: #1a1f14; }
+
+  .botoes-row { display: flex; gap: 8px; margin-top: 14px; }
+  .btn-card {
+    flex: 1; text-align: center; padding: 10px; border-radius: 10px;
+    font-size: 12.5px; font-weight: 700; cursor: pointer; border: 1px solid;
+    text-decoration: none; font-family: 'Inter', sans-serif;
+  }
+  .btn-editar { background: transparent; border-color: #e0a840; color: #e0a840; }
+  .btn-marcar { background: #e0a840; border-color: #e0a840; color: #1a1f14; }
+  .btn-excluir { background: transparent; border-color: #c0392b; color: #c0392b; }
+
+  .loading-state, .error-state { text-align: center; padding-top: 40px; color: #b7bbab; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <a href="/" class="voltar">← Voltar</a>
+  <h1>Minhas vagas</h1>
+  <div id="lista">
+    <div class="loading-state">Carregando...</div>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+
+function getDeviceId() {
+  let id = localStorage.getItem('trampo_device_id');
+  if (!id) {
+    id = 'web-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem('trampo_device_id', id);
+  }
+  return id;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+async function carregar() {
+  const el = document.getElementById('lista');
+  try {
+    const resp = await fetch(`${API_BASE}/vagas/minhas?device_id=${getDeviceId()}`);
+    if (!resp.ok) throw new Error();
+    const vagas = await resp.json();
+
+    if (vagas.length === 0) {
+      el.innerHTML = '<div class="error-state">Você ainda não publicou nenhuma vaga por aqui.</div>';
+      return;
+    }
+
+    el.innerHTML = vagas.map(v => `
+      <div class="card" data-id="${v.id}">
+        <div class="card-topo">
+          <div>
+            <div class="card-cargo">${escapeHtml(v.cargo)}</div>
+            <div class="card-meta">${escapeHtml(v.area)} · ${escapeHtml(v.bairro)}</div>
+          </div>
+          <span class="badge ${v.ativa ? 'aberta' : 'fechada'}">${v.ativa ? 'Aberta' : 'Fechada'}</span>
+        </div>
+        <div class="botoes-row">
+          <a class="btn-card btn-editar" href="/editar.html?id=${v.id}">Editar</a>
+          <button class="btn-card btn-marcar" data-acao="marcar" data-preenchida="${v.ativa}">
+            ${v.ativa ? 'Marcar como preenchida' : 'Reabrir vaga'}
+          </button>
+          <button class="btn-card btn-excluir" data-acao="excluir">Excluir</button>
+        </div>
+      </div>
+    `).join('');
+
+    el.querySelectorAll('[data-acao="marcar"]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const card = e.target.closest('.card');
+        const id = card.dataset.id;
+        const preenchida = e.target.dataset.preenchida === 'true';
+        try {
+          await fetch(`${API_BASE}/vagas/${id}/marcar-preenchida`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_id: getDeviceId(), preenchida }),
+          });
+          carregar();
+        } catch {
+          alert('Não foi possível atualizar a vaga.');
+        }
+      });
+    });
+
+    el.querySelectorAll('[data-acao="excluir"]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        if (!confirm('Tem certeza que deseja excluir essa vaga?')) return;
+        const card = e.target.closest('.card');
+        const id = card.dataset.id;
+        try {
+          await fetch(`${API_BASE}/vagas/${id}?device_id=${getDeviceId()}`, { method: 'DELETE' });
+          carregar();
+        } catch {
+          alert('Não foi possível excluir a vaga.');
+        }
+      });
+    });
+  } catch (e) {
+    el.innerHTML = '<div class="error-state">Não foi possível carregar suas vagas.</div>';
+  }
+}
+
+carregar();
+</script>
+</body>
+</html>
