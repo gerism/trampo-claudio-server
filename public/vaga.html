@@ -85,8 +85,8 @@ async function carregar() {
 
     const numero = (v.whatsapp || '').replace(/\D/g, '');
     const textoWhats = encodeURIComponent(`Olá! Vi a vaga de ${v.cargo} na ${v.empresa_nome} pelo Trampo Cláudio e gostaria de saber mais.`);
-
     el.innerHTML = `
+      <a href="/" style="color:#e0a840; text-decoration:none; font-size:13px; font-weight:700; display:inline-block; margin-bottom:16px;">← Voltar</a>
       <div class="selo">TR</div>
       <h1>${escapeHtml(v.cargo)}</h1>
       <div class="empresa">${escapeHtml(v.empresa_nome)}</div>
@@ -102,11 +102,8 @@ async function carregar() {
           <p>${escapeHtml(v.descricao)}</p>
         </div>
       ` : ''}
-      <a class="cta-whatsapp" href="https://wa.me/55${numero}?text=${textoWhats}" target="_blank" rel="noopener">
+         <a class="cta-whatsapp" href="https://wa.me/55${numero}?text=${textoWhats}" target="_blank" rel="noopener">
         📲 Chamar no WhatsApp
-      </a>
-      <a class="baixar-app" href="https://play.google.com/store/apps/details?id=com.trampoclaudiotemp" target="_blank" rel="noopener">
-        📱 Baixar o app Trampo Cláudio
       </a>
     `;
   } catch (e) {
