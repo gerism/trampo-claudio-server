@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<title>Trampo Cláudio — Vagas de emprego em Cláudio, MG</title>
+<script>
+  // Quem acessa pelo Android é redirecionado direto pra Play Store,
+  // sem precisar ver o site no navegador — só iPhone/PC veem o site.
+  if (/Android/i.test(navigator.userAgent)) {
+    window.location.href = 'https://play.google.com/store/apps/details?id=com.trampoclaudiotemp';
+  }
+</script>
+<meta property="og:title" content="Trampo Cláudio">
+<meta property="og:description" content="Vagas de emprego em Cláudio, MG, direto com quem contrata.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1f14;
+    color: #f4f1e8;
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+  }
+  .container { max-width: 480px; margin: 0 auto; padding: 24px 20px 40px; }
+  .hero-top { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .selo {
+    width: 40px; height: 40px; border-radius: 8px;
+    background: #e0a840; display: flex; align-items: center; justify-content: center;
+    transform: rotate(-4deg); font-weight: 800; color: #1a1f14;
+  }
+  .brand-name { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; }
+  .brand-tag { font-size: 12px; color: #b7bbab; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; margin-bottom: 20px; }
+  .card {
+    display: block; background: #f4f1e8; color: #1a1f14; border-radius: 14px;
+    padding: 14px; margin-bottom: 12px; text-decoration: none;
+  }
+  .card-cargo { font-weight: 700; font-size: 15px; }
+  .card-empresa { font-size: 12.5px; color: #5a5a4f; margin-top: 2px; }
+  .card-meta { font-size: 11px; color: #b48a2e; margin-top: 8px; }
+  .baixar-app {
+    display: block; text-align: center; background: #e0a840; color: #1a1f14;
+    text-decoration: none; padding: 16px; border-radius: 12px; font-weight: 700;
+    margin-top: 20px;
+  }
+  .loading-state, .error-state { text-align: center; padding-top: 60px; color: #b7bbab; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="hero-top">
+    <div class="selo">TR</div>
+    <div>
+      <div class="brand-name">Trampo Cláudio</div>
+      <div class="brand-tag">Cláudio, Minas Gerais</div>
+    </div>
+  </div>
+  <h1>Vagas de emprego em Cláudio</h1>
+  <div id="lista">
+    <div class="loading-state">Carregando...</div>
+  </div>
+  <a class="baixar-app" href="https://play.google.com/store/apps/details?id=com.trampoclaudiotemp" target="_blank" rel="noopener">
+    📱 Baixar o app Trampo Cláudio
+  </a>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+async function carregar() {
+  const el = document.getElementById('lista');
+  try {
+    const resp = await fetch(`${API_BASE}/vagas`);
+    if (!resp.ok) throw new Error('erro');
+    const vagas = await resp.json();
+
+    if (vagas.length === 0) {
+      el.innerHTML = '<div class="error-state">Nenhuma vaga por aqui ainda.</div>';
+      return;
+    }
+
+    el.innerHTML = vagas.map(v => `
+      <a class="card" href="/vaga.html?id=${v.id}">
+        <div class="card-cargo">${escapeHtml(v.cargo)}</div>
+        <div class="card-empresa">${escapeHtml(v.empresa_nome)}</div>
+        <div class="card-meta">${escapeHtml(v.area)} · ${escapeHtml(v.bairro)}</div>
+      </a>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="error-state">Não foi possível carregar as vagas agora.</div>';
+  }
+}
+
+carregar();
+</script>
+</body>
+</html>
