@@ -48,11 +48,14 @@
   }
   .search-box input::placeholder { color: #7a7d6f; }
 
-  .chip-row {
-    display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 16px;
-    scrollbar-width: none;
-  }
-  .chip-row::-webkit-scrollbar { display: none; }
+ .chip-row {
+  display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: #e0a840 #22271d;
+}
+.chip-row::-webkit-scrollbar { height: 6px; }
+.chip-row::-webkit-scrollbar-track { background: #22271d; border-radius: 10px; }
+.chip-row::-webkit-scrollbar-thumb { background: #e0a840; border-radius: 10px; }
   .chip {
     flex-shrink: 0; background: #22271d; border: 1px solid #333a28; border-radius: 100px;
     padding: 8px 14px; font-size: 12.5px; color: #b7bbab; font-weight: 600;
