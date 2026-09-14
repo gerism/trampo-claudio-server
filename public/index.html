@@ -25,7 +25,7 @@
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
   }
-  .container { max-width: 480px; margin: 0 auto; padding: 0 0 40px; }
+  .container { max-width: 480px; margin: 0 auto; padding: 0 0 100px; }
   .banner-topo { width: 100%; display: block; }
   .hero-top { display: flex; align-items: center; gap: 10px; margin: 20px 0; padding: 0 20px; }
   .selo {
@@ -69,11 +69,20 @@
   .card-empresa { font-size: 12.5px; color: #5a5a4f; margin-top: 2px; }
   .card-meta { font-size: 11px; color: #b48a2e; margin-top: 8px; }
 
-  .baixar-app {
-    display: block; text-align: center; background: #e0a840; color: #1a1f14;
-    text-decoration: none; padding: 16px; border-radius: 12px; font-weight: 700;
-    margin: 20px 20px 0;
+  .btn-anunciar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #e0a840;
+    color: #1a1f14;
+    text-decoration: none;
+    padding: 14px 22px;
+    border-radius: 100px;
+    font-weight: 700;
+    font-size: 14px;
   }
+
   .loading-state, .error-state { text-align: center; padding-top: 40px; color: #b7bbab; }
 </style>
 </head>
@@ -101,11 +110,11 @@
   <div class="lista" id="lista">
     <div class="loading-state">Carregando...</div>
   </div>
-
-  <a class="baixar-app" href="https://play.google.com/store/apps/details?id=com.trampoclaudiotemp" target="_blank" rel="noopener">
-    📱 Baixar o app Trampo Cláudio
-  </a>
 </div>
+
+<a class="btn-anunciar" href="https://play.google.com/store/apps/details?id=com.trampoclaudiotemp" target="_blank" rel="noopener">
+  + Anunciar vaga
+</a>
 
 <script>
 const API_BASE = window.location.origin;
