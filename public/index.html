@@ -25,8 +25,9 @@
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
   }
-  .container { max-width: 480px; margin: 0 auto; padding: 24px 20px 40px; }
-  .hero-top { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .container { max-width: 480px; margin: 0 auto; padding: 0 0 40px; }
+  .banner-topo { width: 100%; display: block; }
+  .hero-top { display: flex; align-items: center; gap: 10px; margin: 20px 0; padding: 0 20px; }
   .selo {
     width: 40px; height: 40px; border-radius: 8px;
     background: #e0a840; display: flex; align-items: center; justify-content: center;
@@ -34,7 +35,32 @@
   }
   .brand-name { font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; }
   .brand-tag { font-size: 12px; color: #b7bbab; }
-  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; margin-bottom: 20px; }
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 22px; margin-bottom: 16px; padding: 0 20px; }
+
+  .search-box {
+    display: flex; align-items: center; gap: 8px;
+    background: #22271d; border: 1px solid #333a28; border-radius: 12px;
+    padding: 11px 14px; margin: 0 20px 14px;
+  }
+  .search-box input {
+    background: none; border: none; outline: none; color: #f4f1e8;
+    font-size: 14px; width: 100%; font-family: 'Inter', sans-serif;
+  }
+  .search-box input::placeholder { color: #7a7d6f; }
+
+  .chip-row {
+    display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 16px;
+    scrollbar-width: none;
+  }
+  .chip-row::-webkit-scrollbar { display: none; }
+  .chip {
+    flex-shrink: 0; background: #22271d; border: 1px solid #333a28; border-radius: 100px;
+    padding: 8px 14px; font-size: 12.5px; color: #b7bbab; font-weight: 600;
+    cursor: pointer; font-family: 'Inter', sans-serif;
+  }
+  .chip.active { background: #e0a840; border-color: #e0a840; color: #1a1f14; }
+
+  .lista { padding: 0 20px; }
   .card {
     display: block; background: #f4f1e8; color: #1a1f14; border-radius: 14px;
     padding: 14px; margin-bottom: 12px; text-decoration: none;
@@ -42,17 +68,20 @@
   .card-cargo { font-weight: 700; font-size: 15px; }
   .card-empresa { font-size: 12.5px; color: #5a5a4f; margin-top: 2px; }
   .card-meta { font-size: 11px; color: #b48a2e; margin-top: 8px; }
+
   .baixar-app {
     display: block; text-align: center; background: #e0a840; color: #1a1f14;
     text-decoration: none; padding: 16px; border-radius: 12px; font-weight: 700;
-    margin-top: 20px;
+    margin: 20px 20px 0;
   }
-  .loading-state, .error-state { text-align: center; padding-top: 60px; color: #b7bbab; }
+  .loading-state, .error-state { text-align: center; padding-top: 40px; color: #b7bbab; }
 </style>
 </head>
 <body>
 
 <div class="container">
+  <img src="/banner-app.png" alt="Trampo Cláudio" class="banner-topo">
+
   <div class="hero-top">
     <div class="selo">TR</div>
     <div>
@@ -61,9 +90,18 @@
     </div>
   </div>
   <h1>Vagas de emprego em Cláudio</h1>
-  <div id="lista">
+
+  <div class="search-box">
+    <span>🔍</span>
+    <input id="busca" type="text" placeholder="Pedreiro, vendedor, diarista...">
+  </div>
+
+  <div class="chip-row" id="chips"></div>
+
+  <div class="lista" id="lista">
     <div class="loading-state">Carregando...</div>
   </div>
+
   <a class="baixar-app" href="https://play.google.com/store/apps/details?id=com.trampoclaudiotemp" target="_blank" rel="noopener">
     📱 Baixar o app Trampo Cláudio
   </a>
@@ -72,21 +110,52 @@
 <script>
 const API_BASE = window.location.origin;
 
+const AREAS = [
+  'Construção', 'Comércio e Vendas', 'Alimentação', 'Domésticos e Cuidados',
+  'Logística e Transporte', 'Indústria e Produção', 'Administrativo',
+  'Beleza e Estética', 'Saúde', 'Educação', 'Rural e Agropecuária',
+  'Segurança e Limpeza', 'Outros',
+];
+
+let areaAtiva = null;
+let debounceTimer = null;
+
+function renderChips() {
+  const el = document.getElementById('chips');
+  const chips = [{ label: 'Todas', value: null }, ...AREAS.map(a => ({ label: a, value: a }))];
+  el.innerHTML = chips.map(c => `
+    <button class="chip ${areaAtiva === c.value ? 'active' : ''}" data-area="${c.value ?? ''}">${c.label}</button>
+  `).join('');
+  el.querySelectorAll('.chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.dataset.area || null;
+      areaAtiva = areaAtiva === val ? null : val;
+      renderChips();
+      carregarLista();
+    });
+  });
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str || '';
   return div.innerHTML;
 }
 
-async function carregar() {
+async function carregarLista() {
   const el = document.getElementById('lista');
+  const busca = document.getElementById('busca').value.trim();
+  el.innerHTML = '<div class="loading-state">Carregando...</div>';
   try {
-    const resp = await fetch(`${API_BASE}/vagas`);
+    const params = new URLSearchParams();
+    if (areaAtiva) params.append('area', areaAtiva);
+    if (busca) params.append('cargo', busca);
+    const resp = await fetch(`${API_BASE}/vagas?${params.toString()}`);
     if (!resp.ok) throw new Error('erro');
     const vagas = await resp.json();
 
     if (vagas.length === 0) {
-      el.innerHTML = '<div class="error-state">Nenhuma vaga por aqui ainda.</div>';
+      el.innerHTML = '<div class="error-state">Nenhuma vaga encontrada por aqui ainda.</div>';
       return;
     }
 
@@ -102,7 +171,19 @@ async function carregar() {
   }
 }
 
-carregar();
+document.getElementById('busca').addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(carregarLista, 400);
+});
+
+renderChips();
+carregarLista();
+
+document.getElementById('chips').addEventListener('wheel', (e) => {
+  if (e.deltaY === 0) return;
+  e.preventDefault();
+  document.getElementById('chips').scrollLeft += e.deltaY;
+});
 </script>
 </body>
 </html>
