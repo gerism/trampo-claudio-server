@@ -8,6 +8,24 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCXXOns9P1nb3e2qQ8mmTy2JA9dAXDz358",
+    authDomain: "trampo-claudio.firebaseapp.com",
+    projectId: "trampo-claudio",
+    storageBucket: "trampo-claudio.firebasestorage.app",
+    messagingSenderId: "202268677612",
+    appId: "1:202268677612:web:31d62d64146fefafdf9cc9"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  window.firebaseAuth = getAuth(app);
+  window.firebaseRecaptchaVerifier = RecaptchaVerifier;
+  window.firebaseSignInWithPhoneNumber = signInWithPhoneNumber;
+</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -53,6 +71,25 @@
   .mensagem { text-align: center; padding: 60px 20px; }
   .mensagem h2 { font-family: 'Space Grotesk', sans-serif; font-size: 20px; margin-bottom: 10px; }
   .mensagem p { color: #b7bbab; font-size: 14px; }
+
+  .etapa-sms { text-align: center; padding: 40px 0; }
+  .etapa-sms h2 { font-family: 'Space Grotesk', sans-serif; font-size: 20px; margin-bottom: 10px; }
+  .etapa-sms p { color: #b7bbab; font-size: 13.5px; line-height: 20px; }
+  .etapa-sms .numero { color: #e0a840; font-weight: 700; }
+  .input-codigo {
+    margin-top: 30px; background: #22271d; border: 1px solid #333a28; border-radius: 14px;
+    padding: 16px; width: 200px; text-align: center; font-size: 24px; letter-spacing: 8px;
+    color: #f4f1e8;
+  }
+  .erro-sms { color: #e06b5a; font-size: 12.5px; margin-top: 14px; }
+  .botao-confirmar {
+    margin-top: 24px; background: #4a7c3a; color: #fff; border: none; border-radius: 14px;
+    padding: 15px 50px; font-weight: 800; font-size: 15px; cursor: pointer;
+    font-family: 'Inter', sans-serif;
+  }
+  .botao-confirmar:disabled { opacity: 0.6; }
+  .reenviar-link { color: #e0a840; font-size: 12.5px; font-weight: 600; margin-top: 18px; display: inline-block; cursor: pointer; background: none; border: none; font-family: 'Inter', sans-serif; }
+  .reenviar-link:disabled { color: #7a7d6f; cursor: default; }
 </style>
 </head>
 <body>
@@ -87,7 +124,20 @@
     <label>Descrição</label>
     <textarea id="descricao" placeholder="Detalhes da vaga..."></textarea>
 
+    <div id="recaptcha-container"></div>
+
     <button class="botao-publicar" id="btnPublicar">Publicar vaga</button>
+  </div>
+
+  <div class="etapa-sms" id="etapaSms" style="display:none;">
+    <h2>Confirme seu WhatsApp</h2>
+    <p>Enviamos um código por SMS para<br><span class="numero" id="numeroExibido"></span></p>
+    <input class="input-codigo" id="codigoSms" type="text" inputmode="numeric" maxlength="6" placeholder="000000">
+    <div class="erro-sms" id="erroSms" style="display:none;"></div>
+    <div>
+      <button class="botao-confirmar" id="btnConfirmarSms">Confirmar</button>
+    </div>
+    <button class="reenviar-link" id="btnReenviar">Não recebi o código — reenviar</button>
   </div>
 
   <div class="mensagem" id="mensagemSucesso" style="display:none;">
@@ -108,6 +158,9 @@ const AREAS = [
 
 let areaSelecionada = null;
 let debounceCargo = null;
+let confirmationResult = null;
+let dadosVagaPendente = null;
+let recaptchaVerifier = null;
 
 function getDeviceId() {
   let id = localStorage.getItem('trampo_device_id');
@@ -163,6 +216,28 @@ document.getElementById('cargo').addEventListener('input', (e) => {
   }, 300);
 });
 
+function paraE164(numero) {
+  const soDigitos = numero.replace(/\D/g, '');
+  return `+55${soDigitos}`;
+}
+
+async function publicarVagaDeVerdade() {
+  try {
+    const resp = await fetch(`${API_BASE}/vagas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dadosVagaPendente),
+    });
+    if (!resp.ok) throw new Error();
+
+    document.getElementById('etapaSms').style.display = 'none';
+    document.getElementById('mensagemSucesso').style.display = 'block';
+  } catch {
+    document.getElementById('erroSms').textContent = 'Confirmamos seu número, mas houve um erro ao publicar. Tenta de novo.';
+    document.getElementById('erroSms').style.display = 'block';
+  }
+}
+
 document.getElementById('btnPublicar').addEventListener('click', async () => {
   const empresaNome = document.getElementById('empresaNome').value.trim();
   const whatsapp = document.getElementById('whatsapp').value.replace(/\D/g, '');
@@ -178,34 +253,80 @@ document.getElementById('btnPublicar').addEventListener('click', async () => {
   if (!cargo) return alert('Informe o cargo');
   if (!bairro) return alert('Informe o bairro');
 
+  dadosVagaPendente = {
+    device_id: getDeviceId(),
+    empresa_nome: empresaNome,
+    whatsapp,
+    area: areaSelecionada,
+    cargo,
+    bairro,
+    tipo_contrato: tipoContrato || undefined,
+    salario: salario || undefined,
+    descricao: descricao || undefined,
+  };
+
   const btn = document.getElementById('btnPublicar');
   btn.disabled = true;
-  btn.textContent = 'Publicando...';
+  btn.textContent = 'Enviando código...';
 
   try {
-    const resp = await fetch(`${API_BASE}/vagas`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        device_id: getDeviceId(),
-        empresa_nome: empresaNome,
-        whatsapp,
-        area: areaSelecionada,
-        cargo,
-        bairro,
-        tipo_contrato: tipoContrato || undefined,
-        salario: salario || undefined,
-        descricao: descricao || undefined,
-      }),
-    });
-    if (!resp.ok) throw new Error();
+    if (!recaptchaVerifier) {
+      recaptchaVerifier = new window.firebaseRecaptchaVerifier(window.firebaseAuth, 'recaptcha-container', {
+        size: 'invisible',
+      });
+    }
+    const numeroE164 = paraE164(whatsapp);
+    confirmationResult = await window.firebaseSignInWithPhoneNumber(window.firebaseAuth, numeroE164, recaptchaVerifier);
 
+    document.getElementById('numeroExibido').textContent = whatsapp;
     document.getElementById('form-area').style.display = 'none';
-    document.getElementById('mensagemSucesso').style.display = 'block';
-  } catch {
-    alert('Não foi possível publicar a vaga. Tente de novo.');
+    document.getElementById('etapaSms').style.display = 'block';
+    document.getElementById('codigoSms').focus();
+  } catch (e) {
+    console.log('ERRO_ENVIO_SMS:', e?.code, '|', e?.message);
+    alert('Não foi possível enviar o código. Confere se o número está certo e tenta de novo.');
     btn.disabled = false;
     btn.textContent = 'Publicar vaga';
+  }
+});
+
+document.getElementById('btnConfirmarSms').addEventListener('click', async () => {
+  const codigo = document.getElementById('codigoSms').value.trim();
+  if (codigo.length < 6) {
+    document.getElementById('erroSms').textContent = 'Digite os 6 dígitos que chegaram por SMS.';
+    document.getElementById('erroSms').style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('btnConfirmarSms');
+  btn.disabled = true;
+  btn.textContent = 'Confirmando...';
+  document.getElementById('erroSms').style.display = 'none';
+
+  try {
+    await confirmationResult.confirm(codigo);
+    await publicarVagaDeVerdade();
+  } catch (e) {
+    console.log('ERRO_VERIFICACAO_SMS:', e?.code, '|', e?.message);
+    document.getElementById('erroSms').textContent = 'Código incorreto. Confere e tenta de novo.';
+    document.getElementById('erroSms').style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Confirmar';
+  }
+});
+
+document.getElementById('btnReenviar').addEventListener('click', async () => {
+  const btn = document.getElementById('btnReenviar');
+  btn.disabled = true;
+  try {
+    const numeroE164 = paraE164(dadosVagaPendente.whatsapp);
+    confirmationResult = await window.firebaseSignInWithPhoneNumber(window.firebaseAuth, numeroE164, recaptchaVerifier);
+    document.getElementById('erroSms').style.display = 'none';
+  } catch (e) {
+    document.getElementById('erroSms').textContent = 'Não foi possível reenviar. Tenta de novo em instantes.';
+    document.getElementById('erroSms').style.display = 'block';
+  } finally {
+    setTimeout(() => { btn.disabled = false; }, 30000);
   }
 });
 
